@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using Microsoft.AspNet.SignalR.Configuration;
 using Microsoft.AspNet.SignalR.Infrastructure;
@@ -124,6 +125,13 @@ namespace Microsoft.AspNet.SignalR.Transports
             {
                 Trace.TraceInformation("Connection {0} is New.", connection.ConnectionId);
             }
+            else
+            {
+                var newId = GetRequestId(connection.Url.Query);
+                var oldId = GetRequestId(oldConnection.Url.Query);
+
+                Debug.WriteLine("ProcessRequest({0}) Replaced Connection: {1}", newId, oldId);
+            }
 
             lock (_counterLock)
             {
@@ -136,6 +144,22 @@ namespace Microsoft.AspNet.SignalR.Transports
             newMetadata.Connection.ApplyState(TransportConnectionStates.Added);
 
             return oldConnection;
+        }
+
+        private static int? GetRequestId(string queryString)
+        {
+            var r = new Regex(@"requestId=(?<requestId>\d+)");
+            var m = r.Match(queryString);
+            if (m.Success && m.Groups.Count == 2)
+            {
+                int result;
+                if (int.TryParse(m.Groups["requestId"].ToString(), out result))
+                {
+                    return result;
+                }
+            }
+
+            return null;
         }
 
         /// <summary>

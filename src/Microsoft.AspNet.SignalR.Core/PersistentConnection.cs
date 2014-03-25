@@ -183,6 +183,12 @@ namespace Microsoft.AspNet.SignalR
         /// </exception>
         public virtual Task ProcessRequest(HostContext context)
         {
+            int requestId;
+            if (int.TryParse(context.Request.QueryString["requestId"], out requestId))
+            {
+                Debug.WriteLine("ProcessRequest({0}) Received Request", requestId);
+            }
+
             if (context == null)
             {
                 throw new ArgumentNullException("context");
@@ -274,7 +280,11 @@ namespace Microsoft.AspNet.SignalR
                 return TaskAsyncHelper.FromMethod(() => OnDisconnected(context.Request, connectionId).OrEmpty());
             };
 
-            return Transport.ProcessRequest(connection).OrEmpty().Catch(Counters.ErrorsAllTotal, Counters.ErrorsAllPerSec);
+            var processRequestTask = Transport.ProcessRequest(connection).OrEmpty().Catch(Counters.ErrorsAllTotal, Counters.ErrorsAllPerSec);
+
+            processRequestTask.ContinueWith(t => Debug.WriteLine("ProcessRequest({0}) Response Completed. Status: {1}", requestId, t.Status));
+
+            return processRequestTask;
         }
 
         [SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes", Justification = "We want to catch any exception when unprotecting data.")]

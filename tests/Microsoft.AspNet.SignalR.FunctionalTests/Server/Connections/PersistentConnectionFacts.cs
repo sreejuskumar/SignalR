@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNet.SignalR.Client.Http;
 using Microsoft.AspNet.SignalR.Configuration;
 using Microsoft.AspNet.SignalR.FunctionalTests;
 using Microsoft.AspNet.SignalR.Hosting.Memory;
@@ -20,11 +21,19 @@ namespace Microsoft.AspNet.SignalR.Tests
 {
     public class PersistentConnectionFacts
     {
+        private static int _requestId;
+
         public class OnConnectedAsync : HostedTest
         {
-            [Fact]
+            [Theory]
+            [InlineData()]
+            [InlineData()]
+            [InlineData()]
+            [InlineData()]
+            [InlineData()]
             public void ConnectionsWithTheSameConnectionIdSSECloseGracefully()
             {
+                Debug.Listeners.Clear();
                 using (var host = new MemoryHost())
                 {
                     host.Configure(app =>
@@ -41,24 +50,39 @@ namespace Microsoft.AspNet.SignalR.Tests
 
                     string id = Guid.NewGuid().ToString("d");
 
-                    var tasks = new List<Task>();
+                    var tasks = new Task[1000];
 
                     for (int i = 0; i < 1000; i++)
                     {
-                        tasks.Add(ProcessRequest(host, "serverSentEvents", id));
+                        tasks[i] = ProcessRequest(host, "serverSentEvents", id);
                     }
 
-                    ProcessRequest(host, "serverSentEvents", id);
+                    var finalRequest = ProcessRequest(host, "serverSentEvents", id);
 
-                    Task.WaitAll(tasks.ToArray());
+                    try
+                    {
+                        Assert.True(Task.WaitAll(tasks, TimeSpan.FromSeconds(30)));
+                    }
+                    catch (Exception)
+                    {
+                        Debug.WriteLine(string.Join(", ", tasks.Select(t => t.Status)));
+                        throw;
+                    }
 
-                    Assert.True(tasks.All(t => !t.IsFaulted));
+                    Assert.True(tasks.All(t => t.Status == TaskStatus.RanToCompletion));
+                    Assert.False(finalRequest.IsCompleted);
                 }
             }
 
-            [Fact]
+            [Theory]
+            [InlineData()]
+            [InlineData()]
+            [InlineData()]
+            [InlineData()]
+            [InlineData()]
             public void ConnectionsWithTheSameConnectionIdLongPollingCloseGracefully()
             {
+                Debug.Listeners.Clear();
                 using (var host = new MemoryHost())
                 {
                     host.Configure(app =>
@@ -75,24 +99,39 @@ namespace Microsoft.AspNet.SignalR.Tests
 
                     string id = Guid.NewGuid().ToString("d");
 
-                    var tasks = new List<Task>();
+                    var tasks = new Task[1000];
 
                     for (int i = 0; i < 1000; i++)
                     {
-                        tasks.Add(ProcessRequest(host, "longPolling", id));
+                        tasks[i] = ProcessRequest(host, "longPolling", id);
                     }
 
-                    ProcessRequest(host, "longPolling", id);
+                    var finalRequest = ProcessRequest(host, "longPolling", id);
 
-                    Assert.True(Task.WaitAll(tasks.ToArray(), TimeSpan.FromSeconds(10)));
+                    try
+                    {
+                        Assert.True(Task.WaitAll(tasks, TimeSpan.FromSeconds(30)));
+                    }
+                    catch (Exception)
+                    {
+                        Debug.WriteLine(string.Join(", ", tasks.Select(t => t.Status)));
+                        throw;
+                    }
 
-                    Assert.True(tasks.All(t => !t.IsFaulted));
+                    Assert.True(tasks.All(t => t.Status == TaskStatus.RanToCompletion));
+                    //Assert.False(finalRequest.IsCompleted);
                 }
             }
 
-            private static Task ProcessRequest(MemoryHost host, string transport, string connectionToken)
+            private static async Task<string> ProcessRequest(MemoryHost host, string transport, string connectionToken)
             {
-                return host.Get("http://foo/echo/connect?transport=" + transport + "&connectionToken=" + connectionToken, r => { }, isLongRunning: true);
+                var requestId = _requestId++;
+                Debug.WriteLine("ProcessRequest({0})", requestId);
+                var response = await host.Get("http://foo/echo/connect?transport=" + transport + "&connectionToken=" + connectionToken + "&requestId=" + requestId, r => { }, isLongRunning: true);
+                Debug.WriteLine("ProcessRequest({0}) Response Began", requestId);
+                var result = await response.ReadAsString();
+                Debug.WriteLine("ProcessRequest({0}) Response Text: '{1}'", requestId, result);
+                return result;
             }
 
             [Fact]
