@@ -63,6 +63,14 @@
         return url;
     }
 
+    function getAjaxUrl(connection, path) {
+        var url = connection.url + path
+            + "?transport=" + connection.transport.name
+            + "&connectionToken=" + window.encodeURIComponent(connection.token);
+
+        return transportLogic.prepareQueryString(connection, url);
+    }
+
     transportLogic = signalR.transports._logic = {
         ajax: function (connection, options) {
             return $.ajax(
@@ -248,13 +256,12 @@
 
         ajaxSend: function (connection, data) {
             var payload = transportLogic.stringifySend(connection, data),
-                url = connection.url + "/send" + "?transport=" + connection.transport.name + "&connectionToken=" + window.encodeURIComponent(connection.token),
+                url = getAjaxUrl("/send"),
                 xhr,
                 onFail = function (error, connection) {
                     $(connection).triggerHandler(events.onError, [signalR._.transportError(signalR.resources.sendFailed, connection.transport, error, xhr), data]);
                 };
 
-            url = transportLogic.prepareQueryString(connection, url);
 
             xhr = transportLogic.ajax(connection, {
                 url: url,
@@ -302,8 +309,7 @@
             // Async by default unless explicitly overidden
             async = typeof async === "undefined" ? true : async;
 
-            var url = connection.url + "/abort" + "?transport=" + connection.transport.name + "&connectionToken=" + window.encodeURIComponent(connection.token);
-            url = transportLogic.prepareQueryString(connection, url);
+            var url = getAjaxUrl("/abort");
 
             transportLogic.ajax(connection, {
                 url: url,
@@ -316,8 +322,20 @@
         },
 
         tryInitialize: function (persistentResponse, onInitialized) {
+            var startUrl, xhr;
+
             if (persistentResponse.Initialized) {
-                onInitialized();
+                startUrl = getAjaxUrl("/start");
+
+                xhr = transportLogic.ajax(connection, {
+                    url: startUrl,
+                    success: onInitialized,
+                    error: function (error) {
+                        var wrappedError = signalR._.error(signalR.resources.startRequestFailed, error, xhr);
+                        $(connection).triggerHandler(events.onError, [wrappedError]);
+                        connection.stop();
+                    }
+                });
             }
         },
 

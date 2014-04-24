@@ -22,6 +22,7 @@
         stoppedWhileNegotiating: "The connection was stopped during the negotiate request.",
         errorParsingNegotiateResponse: "Error parsing negotiate response.",
         protocolIncompatible: "You are using a version of the client that isn't compatible with the server. Client version {0}, server version {1}.",
+        startRequestFailed: "Start request failed. Stopping connection.",
         sendFailed: "Send failed.",
         parseFailed: "Failed at parsing response: {0}",
         longPollFailed: "Long polling request failed.",
@@ -399,7 +400,7 @@
 
         state: signalR.connectionState.disconnected,
 
-        clientProtocol: "1.3",
+        clientProtocol: "1.4",
 
         reconnectDelay: 2000,
 

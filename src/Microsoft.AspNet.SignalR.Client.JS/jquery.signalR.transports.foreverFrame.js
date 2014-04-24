@@ -165,7 +165,7 @@
 
             response = connection._parseResponse(data);
 
-            transportLogic.processMessages(connection, response, connection.onSuccess);
+            transportLogic.processMessages(connection, response, connection.onSuccess, connection.onFailed);
 
             // Protect against connection stopping from a callback trigger within the processMessages above.
             if (connection.state === $.signalR.connectionState.connected) {
